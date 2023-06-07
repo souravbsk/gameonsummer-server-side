@@ -26,8 +26,11 @@ async function run() {
     await client.connect();
 
     const userCollection = client.db("GameOnSummer").collection("users");
+    const classCollection = client.db("GameOnSummer").collection("classes")
 
 
+
+    //users api create
     app.post("/users", async (req,res) => {
         const newUser = req.body;
         const query = {email: newUser?.email};
@@ -39,6 +42,15 @@ async function run() {
         const result = await userCollection.insertOne(newUser);
         res.send(result)
     })
+
+
+    //classes api create
+    app.get("/classes", async (req,res) => {
+        const result = await classCollection.find({}).sort({ enrolled: -1 }).limit(6).toArray();
+        res.send(result)
+    })
+
+
 
 
 
