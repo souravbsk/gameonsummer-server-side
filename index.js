@@ -27,11 +27,12 @@ async function run() {
     await client.connect();
 
     const userCollection = client.db("GameOnSummer").collection("users");
-    const classCollection = client.db("GameOnSummer").collection("classes")
+    const classCollection = client.db("GameOnSummer").collection("classes");
+    const cartCollection = client.db("GameOnSummer").collection("carts")
 
 
-    app.get("/jwt",(req,res) => {
-        const user = req.query.email;
+    app.post("/jwt",(req,res) => {
+        const user = req.body;
         const token  =jwt.sign(user,process.env.SECRET_ACCESS_TOKEN,{
             expiresIn:"1h"
         })
@@ -55,12 +56,26 @@ async function run() {
 
 
     //classes api create
+    app.get("/topclasses", async (req,res) => {
+      const result = await classCollection.find({}).sort({ enrolled: -1 }).limit(6).toArray();
+      res.send(result)
+  })
     app.get("/classes", async (req,res) => {
-        const result = await classCollection.find({}).sort({ enrolled: -1 }).limit(6).toArray();
+        const result = await classCollection.find({}).sort({ enrolled: -1 }).toArray();
         res.send(result)
     })
 
 
+    //cart api
+    app.post("/carts", async  (req,res) => {
+      const newItem = req.body;
+      const result = await  cartCollection.insertOne(newItem);
+      res.send(result)
+    })
+    app.get("/carts", async (req,res) => {
+      const result = await cartCollection.find({}).toArray()
+      res.send(result)
+    }) 
 
 
 
