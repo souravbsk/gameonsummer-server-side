@@ -139,7 +139,7 @@ async function run() {
     })
 
     //student payment api
-    app.post("/payments", async (req,res) => {
+    app.post("/payments", verifyJWT, async (req,res) => {
       const newPayment = req.body;
       const insertResult = await paymentCollection.insertOne(newPayment);
       const cartId = newPayment.cartItem.map(id => new ObjectId(id))
@@ -150,6 +150,24 @@ async function run() {
     })
 
 
+    // student enroll classes
+    app.get("/enrollClasses", verifyJWT, async (req,res) => {
+      const email = req.query.email;
+      const enrollClass = [];
+      const classResult = await classCollection.find({}).toArray();
+      const query = {email: email}
+      const paymentResult =  await paymentCollection.find(query).toArray();
+      const paymentItem = paymentResult.map(paymentItem => {
+        const classItemId = paymentItem?.classItemId;
+        classItemId.map(classId => {
+          const orderClass = classResult.find(classItem => classItem._id == classId);
+          enrollClass.push(orderClass)
+        })
+      
+      }) 
+      // const filter = 
+      res.send(enrollClass)
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
