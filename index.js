@@ -58,7 +58,30 @@ async function run() {
       res.send({ token });
     });
 
+
+
+    //verify admin middleware ________________________
+    const verifyAdmin = async (req,res,next) => {
+
+      
+      const email  = req?.decoded?.email;
+      const query = {email: email};
+      const user = await userCollection.findOne(query);
+      if(user?.role !== "admin"){
+        return res.status(403).send({error: true, message: "forbidden request"})
+      } 
+      next()
+    }
+
+
+
+
+
+
     //users api create
+
+   
+
     app.post("/users", async (req, res) => {
       const newUser = req.body;
       const query = { email: newUser?.email };
@@ -70,6 +93,75 @@ async function run() {
       const result = await userCollection.insertOne(newUser);
       res.send(result);
     });
+
+
+// admin route >>>>>> all user
+    app.get("/users", verifyJWT, verifyAdmin, async (req,res) => {
+      const result = await userCollection.find({}).toArray();
+      res.send(result)
+    })
+
+// admin route >>>> delete user
+
+
+app.delete("/users/admin/:id", verifyJWT,verifyAdmin, async (req,res) => {
+  const id = req.params.id;
+  const query = {_id: new ObjectId(id)};
+  const result = await userCollection.deleteOne(query);
+  res.send(result)
+
+})
+
+
+
+
+
+    
+    // user make admin___________
+    app.patch("/users/admin/:id", verifyJWT, async (req,res) => {
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)};
+      const updateUserRole  = {
+          $set: {
+            role: "admin",
+          },
+      }
+      const result = await userCollection.updateOne(filter,updateUserRole);
+      res.send(result)
+    })
+
+    // user make instructor
+
+    app.patch("/users/instructor/:id", verifyJWT, async (req,res) => {
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)};
+      const updateUserRole  = {
+          $set: {
+            role: "instructor",
+          },
+      }
+      const result = await userCollection.updateOne(filter,updateUserRole);
+      res.send(result)
+    })
+
+
+
+    // user role fixes api _________________________
+  app.get("/users/admin/:email", verifyJWT, async (req,res) => {
+    const email = req.params.email;
+    if(req.decoded.email !== email){
+      return res.send({admin: false})
+    }
+    const query  = {email: email};
+    const user = await userCollection.findOne(query);
+    console.log(user);
+    const result = {admin: user?.role === "admin"};
+    res.send(result)
+
+  })
+
+
+
 
     //classes api create
     app.get("/topclasses", async (req, res) => {
