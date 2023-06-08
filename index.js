@@ -179,7 +179,7 @@ async function run() {
     });
     app.get("/classes", async (req, res) => {
       const result = await classCollection
-        .find({status:"published"})
+        .find({status:"approved"})
         .sort({ enrolled: -1 })
         .toArray();
       res.send(result);
@@ -197,6 +197,7 @@ async function run() {
       const filter = {_id : new ObjectId(id)}
       const classItemStatus = req.body;
       console.log(classItemStatus);
+
 
 
       const updateStatus = {
@@ -228,6 +229,14 @@ async function run() {
       const result = await classCollection.insertOne(newClass);
       res.send(result);
     });
+
+    // classList for instructor_________________
+    app.get("/classes/instructor/:email", verifyJWT,verifyInstructor, async (req,res) => {
+      const email = req.params.email;
+      const query = {instructorEmail: email};
+      const result = await classCollection.find(query).toArray();
+      res.send(result);
+    })
 
     //cart api______________________________________
     app.post("/carts", async (req, res) => {
