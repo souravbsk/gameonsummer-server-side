@@ -137,7 +137,7 @@ async function run() {
     });
 
     // user role admin or not check api _________________________
-    app.get("/users/admin/:email", verifyJWT, verifyAdmin, async (req, res) => {
+    app.get("/users/admin/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       if (req.decoded.email !== email) {
         return res.send({ admin: false });
@@ -149,24 +149,34 @@ async function run() {
     });
 
     // instructor route >>>.user role instructor or not check api
-    app.get(
-      "/users/instructor/:email",
-      verifyJWT,
-      verifyInstructor,
-      async (req, res) => {
-        const email = req.params.email;
-        console.log(email);
-        if (req.decoded?.email !== email) {
-          return res.send({ instructor: false });
-        }
-
-        const query = { email: email };
-        const user = await userCollection.findOne(query);
-        const result = { instructor: user?.role === "instructor" };
-        console.log(result, "d");
-        res.send(result);
+    app.get("/users/instructor/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      if (req.decoded?.email !== email) {
+        return res.send({ instructor: false });
       }
-    );
+
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const result = { instructor: user?.role === "instructor" };
+      res.send(result);
+    });
+
+
+
+    // student route >>>.user role instructor or not check api
+    app.get("/users/student/:email", verifyJWT, async (req, res) => {
+      const email = req.params?.email;
+ 
+      if (req.decoded?.email != email) {
+        return res.send({ student: false });
+      }
+      const query = { email: email };
+      console.log(query);
+      const user = await userCollection.findOne(query);
+      const result = { student: user?.role === "student" };
+      res.send(result);
+    });
+
 
     //classes api create_______________________________ for user
     app.get("/topclasses", async (req, res) => {
@@ -179,48 +189,45 @@ async function run() {
     });
     app.get("/classes", async (req, res) => {
       const result = await classCollection
-        .find({status:"approved"})
+        .find({ status: "approved" })
         .sort({ enrolled: -1 })
         .toArray();
       res.send(result);
     });
-    app.get("/manageClasses", verifyJWT, verifyAdmin , async (req,res) => {
-      const result = await classCollection
-        .find({})
-        .toArray();
+    app.get("/manageClasses", verifyJWT, verifyAdmin, async (req, res) => {
+      const result = await classCollection.find({}).toArray();
       res.send(result);
-    })
+    });
 
-    // class status change for admin 
-    app.patch("/manageClasses/:id", verifyJWT, verifyAdmin, async (req,res) => {
-      const id = req.params.id;
-      const filter = {_id : new ObjectId(id)}
-      const classItemStatus = req.body;
-      console.log(classItemStatus);
+    // class status change for admin
+    app.patch(
+      "/manageClasses/:id",
+      verifyJWT,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const classItemStatus = req.body;
 
+        const updateStatus = {
+          $set: {
+            status: classItemStatus.status,
+          },
+        };
 
-
-      const updateStatus = {
-        $set: {
-          status: classItemStatus.status,
-        },
-      };
-
-
-      const result = await classCollection.updateOne(filter,updateStatus);
-      res.send(result)
-    })
-
+        const result = await classCollection.updateOne(filter, updateStatus);
+        res.send(result);
+      }
+    );
 
     //classDelete admin______________
 
-    app.delete("/manageClasses/:id", verifyJWT, verifyAdmin, async (req,res) => {
+    app.delete("/manageClasses/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
-      const filter = {_id: new ObjectId(id)};
+      const filter = { _id: new ObjectId(id) };
       const result = await classCollection.deleteOne(filter);
-      res.send(result)
-    })
- 
+      res.send(result);
+    });
 
     // classes post for instructor  ________________________
 
@@ -231,12 +238,18 @@ async function run() {
     });
 
     // classList for instructor_________________
-    app.get("/classes/instructor/:email", verifyJWT,verifyInstructor, async (req,res) => {
-      const email = req.params.email;
-      const query = {instructorEmail: email};
-      const result = await classCollection.find(query).toArray();
-      res.send(result);
-    })
+    app.get(
+      "/instructorClasses",
+      verifyJWT,
+      verifyInstructor,
+      async (req, res) => {
+        const email = req.query.email;
+
+        const query = { instructorEmail: email };
+        const result = await classCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
 
     //cart api______________________________________
     app.post("/carts", async (req, res) => {
@@ -270,7 +283,6 @@ async function run() {
     //online Stipe Payment Api
     app.post("/create-payment-intent", verifyJWT, async (req, res) => {
       const { price } = req.body;
-      console.log(price);
       const amount = price * 100;
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
