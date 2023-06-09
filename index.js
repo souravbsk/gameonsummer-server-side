@@ -215,7 +215,9 @@ async function run() {
       res.send(result);
     });
     app.get("/manageClasses", verifyJWT, verifyAdmin, async (req, res) => {
-      const result = await classCollection.find({}).toArray();
+
+
+      const result = await classCollection.find({}).sort({ status: 1 }).toArray();
       res.send(result);
     });
     app.get("/manageClasses/:id", verifyJWT, async (req,res) => {
@@ -245,6 +247,33 @@ async function run() {
         res.send(result);
       }
     );
+
+
+
+
+    // class review added   for admin
+    app.put(
+      "/manageClasses/:id",
+      verifyJWT,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const reviews = req.body;
+        const options = { upsert: true };
+        const updateReview = {
+          $set: {
+            review: reviews,
+          },
+        };
+
+        const result = await classCollection.updateOne(filter, updateReview,options);
+        res.send(result);
+      }
+    );
+
+
+
 
     //classDelete admin______________
 
@@ -324,7 +353,6 @@ async function run() {
     //student payment api
     app.post("/payments", verifyJWT, verifyStudent, async (req, res) => {
       const newPayment = req.body;
-      console.log(newPayment,"paymer");
 
       const filter = {_id: new ObjectId(newPayment?.classItemId)};
 
