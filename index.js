@@ -159,7 +159,7 @@ async function run() {
     // user role admin or not check api _________________________
     app.get("/users/admin/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
-      if (req.decoded.email !== email) {
+      if (req.decoded?.email !== email) {
         return res.send({ admin: false });
       }
       const query = { email: email };
@@ -218,6 +218,12 @@ async function run() {
       const result = await classCollection.find({}).toArray();
       res.send(result);
     });
+    app.get("/manageClasses/:id", verifyJWT, async (req,res) => {
+      const id  = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const result = await classCollection.findOne(filter);
+      res.send(result)
+    })
 
     // class status change for admin
     app.patch(
@@ -318,12 +324,12 @@ async function run() {
     //student payment api
     app.post("/payments", verifyJWT, verifyStudent, async (req, res) => {
       const newPayment = req.body;
+      console.log(newPayment,"paymer");
 
       const filter = {_id: new ObjectId(newPayment?.classItemId)};
 
 
       const classItems = await classCollection.findOne(filter);
-      console.log(classItems);
       const enrolled = classItems.enrolled + 1;
       const availableSeats = classItems.availableSeats - 1;
       const updateClassItems = {
@@ -342,6 +348,7 @@ async function run() {
       const email = req.query.email;
       const query = { email: email };
       const paymentResult = await paymentCollection.find(query).toArray();
+      console.log(paymentResult);
       res.send(paymentResult);
     });
 
