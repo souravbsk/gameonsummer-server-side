@@ -82,6 +82,26 @@ async function run() {
       }
       next();
     };
+  
+    // verifyStudent middleware 
+
+    const verifyStudent = async (req, res, next) => {
+      const email = req.decoded?.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      if (user?.role !== "student") {
+        return res
+          .status(403)
+          .send({ error: true, message: "forbidden request" });
+      }
+      next();
+    };
+
+
+
+
+
+
     //users api create
 
     app.post("/users", async (req, res) => {
@@ -259,7 +279,7 @@ async function run() {
     });
 
     // student class cart
-    app.get("/carts", verifyJWT, async (req, res) => {
+    app.get("/carts", verifyJWT, verifyStudent, async (req, res) => {
       const email = req.query?.email;
 
       if (req?.decoded?.email !== email) {
@@ -273,7 +293,7 @@ async function run() {
       res.send(result);
     });
 
-    app.delete("/carts/:id", async (req, res) => {
+    app.delete("/carts/:id", verifyJWT,verifyStudent, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await cartCollection.deleteOne(query);
@@ -281,7 +301,7 @@ async function run() {
     });
 
     //online Stipe Payment Api
-    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
+    app.post("/create-payment-intent", verifyJWT, verifyStudent, async (req, res) => {
       const { price } = req.body;
       const amount = price * 100;
       const paymentIntent = await stripe.paymentIntents.create({
@@ -296,35 +316,43 @@ async function run() {
     });
 
     //student payment api
-    app.post("/payments", verifyJWT, async (req, res) => {
+    app.post("/payments", verifyJWT, verifyStudent, async (req, res) => {
       const newPayment = req.body;
+
+      const filter = {_id: new ObjectId(newPayment?.classItemId)};
+
+
+      const classItems = await classCollection.findOne(filter);
+      console.log(classItems);
+      const enrolled = classItems.enrolled + 1;
+      const availableSeats = classItems.availableSeats - 1;
+      const updateClassItems = {
+        $set: { enrolled,availableSeats }
+        };
+
       const insertResult = await paymentCollection.insertOne(newPayment);
-      const cartId = newPayment.cartItem.map((id) => new ObjectId(id));
-      const query = { _id: { $in: cartId } };
-      const deleteResult = await cartCollection.deleteMany(query);
-      res.send({ result: insertResult, deleteResult });
-      // res.send(cartId);
+      const query = { _id: new ObjectId(newPayment?.cartItem) };
+      const deleteResult = await cartCollection.deleteOne(query);
+      const updateResult = await classCollection.updateOne(filter,updateClassItems);
+      res.send({ result: insertResult, deleteResult,updateResult });
     });
 
     // student enroll classes
-    app.get("/enrollClasses", verifyJWT, async (req, res) => {
+    app.get("/enrollClasses", verifyJWT, verifyStudent, async (req, res) => {
       const email = req.query.email;
-      const enrollClass = [];
-      const classResult = await classCollection.find({}).toArray();
       const query = { email: email };
       const paymentResult = await paymentCollection.find(query).toArray();
-      const paymentItem = paymentResult.map((paymentItem) => {
-        const classItemId = paymentItem?.classItemId;
-        classItemId.map((classId) => {
-          const orderClass = classResult.find(
-            (classItem) => classItem._id == classId
-          );
-          enrollClass.push(orderClass);
-        });
-      });
-      // const filter =
-      res.send(enrollClass);
+      res.send(paymentResult);
     });
+
+    // payment history for student classes
+
+    app.get("/student/paymentHistory", verifyJWT, verifyStudent,  async (req,res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const paymentResult = await paymentCollection.find(query).sort({_id:-1}).toArray();
+      res.send(paymentResult);
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
