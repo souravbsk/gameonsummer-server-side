@@ -82,8 +82,8 @@ async function run() {
       }
       next();
     };
-  
-    // verifyStudent middleware 
+
+    // verifyStudent middleware
 
     const verifyStudent = async (req, res, next) => {
       const email = req.decoded?.email;
@@ -96,11 +96,6 @@ async function run() {
       }
       next();
     };
-
-
-
-
-
 
     //users api create
 
@@ -181,12 +176,10 @@ async function run() {
       res.send(result);
     });
 
-
-
     // student route >>>.user role instructor or not check api
     app.get("/users/student/:email", verifyJWT, async (req, res) => {
       const email = req.params?.email;
- 
+
       if (req.decoded?.email != email) {
         return res.send({ student: false });
       }
@@ -196,7 +189,6 @@ async function run() {
       const result = { student: user?.role === "student" };
       res.send(result);
     });
-
 
     //classes api create_______________________________ for user
     app.get("/topclasses", async (req, res) => {
@@ -215,17 +207,18 @@ async function run() {
       res.send(result);
     });
     app.get("/manageClasses", verifyJWT, verifyAdmin, async (req, res) => {
-
-
-      const result = await classCollection.find({}).sort({ status: 1 }).toArray();
+      const result = await classCollection
+        .find({})
+        .sort({ status: 1 })
+        .toArray();
       res.send(result);
     });
-    app.get("/manageClasses/:id", verifyJWT, async (req,res) => {
-      const id  = req.params.id;
-      const filter = {_id: new ObjectId(id)}
+    app.get("/manageClasses/:id", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
       const result = await classCollection.findOne(filter);
-      res.send(result)
-    })
+      res.send(result);
+    });
 
     // class status change for admin
     app.patch(
@@ -248,32 +241,25 @@ async function run() {
       }
     );
 
-
-
-
     // class review added   for admin
-    app.put(
-      "/manageClasses/:id",
-      verifyJWT,
-      verifyAdmin,
-      async (req, res) => {
-        const id = req.params.id;
-        const filter = { _id: new ObjectId(id) };
-        const reviews = req.body;
-        const options = { upsert: true };
-        const updateReview = {
-          $set: {
-            review: reviews,
-          },
-        };
+    app.put("/manageClasses/:id", verifyJWT, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const reviews = req.body;
+      const options = { upsert: true };
+      const updateReview = {
+        $set: {
+          review: reviews,
+        },
+      };
 
-        const result = await classCollection.updateOne(filter, updateReview,options);
-        res.send(result);
-      }
-    );
-
-
-
+      const result = await classCollection.updateOne(
+        filter,
+        updateReview,
+        options
+      );
+      res.send(result);
+    });
 
     //classDelete admin______________
 
@@ -328,7 +314,7 @@ async function run() {
       res.send(result);
     });
 
-    app.delete("/carts/:id", verifyJWT,verifyStudent, async (req, res) => {
+    app.delete("/carts/:id", verifyJWT, verifyStudent, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await cartCollection.deleteOne(query);
@@ -336,41 +322,44 @@ async function run() {
     });
 
     //online Stipe Payment Api
-    app.post("/create-payment-intent", verifyJWT, verifyStudent, async (req, res) => {
-      const { price } = req.body;
-      const amount = price * 100;
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amount,
-        currency: "inr",
-        payment_method_types: ["card"],
-      });
+    app.post(
+      "/create-payment-intent",
+      verifyJWT,
+      verifyStudent,
+      async (req, res) => {
+        const { price } = req.body;
+        const amount = price * 100;
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount,
+          currency: "inr",
+          payment_method_types: ["card"],
+        });
 
-      res.send({
-        clientSecret: paymentIntent.client_secret,
-      });
-    });
+        res.send({
+          clientSecret: paymentIntent.client_secret,
+        });
+      }
+    );
 
     //student payment api
     app.post("/payments", verifyJWT, verifyStudent, async (req, res) => {
       const newPayment = req.body;
-
-      const filter = {_id: new ObjectId(newPayment?.classItemId)};
-
-
+      const filter = { _id: new ObjectId(newPayment?.classItemId) };
       const classItems = await classCollection.findOne(filter);
       const enrolled = classItems.enrolled + 1;
       const availableSeats = classItems.availableSeats - 1;
       const updateClassItems = {
-        $set: { enrolled,availableSeats }
-        };
-
+        $set: { enrolled, availableSeats },
+      };
       const insertResult = await paymentCollection.insertOne(newPayment);
       const query = { _id: new ObjectId(newPayment?.cartItem) };
       const deleteResult = await cartCollection.deleteOne(query);
-      const updateResult = await classCollection.updateOne(filter,updateClassItems);
-      res.send({ result: insertResult, deleteResult,updateResult });
+      const updateResult = await classCollection.updateOne(
+        filter,
+        updateClassItems
+      );
+      res.send({ result: insertResult, deleteResult, updateResult });
     });
-
     // student enroll classes
     app.get("/enrollClasses", verifyJWT, verifyStudent, async (req, res) => {
       const email = req.query.email;
@@ -382,12 +371,105 @@ async function run() {
 
     // payment history for student classes
 
-    app.get("/student/paymentHistory", verifyJWT, verifyStudent,  async (req,res) => {
-      const email = req.query.email;
-      const query = { email: email };
-      const paymentResult = await paymentCollection.find(query).sort({_id:-1}).toArray();
-      res.send(paymentResult);
-    })
+    app.get(
+      "/student/paymentHistory",
+      verifyJWT,
+      verifyStudent,
+      async (req, res) => {
+        const email = req.query.email;
+        const query = { email: email };
+        const paymentResult = await paymentCollection
+          .find(query)
+          .sort({ _id: -1 })
+          .toArray();
+        res.send(paymentResult);
+      }
+    );
+
+    // ___________________________________________________________________________________________________
+
+    // top instructor
+    app.get("/topInstructor", async (req, res) => {
+      const classItems = await classCollection.find({}).toArray();
+      const filter = { role: "instructor" };
+      const userResult = await userCollection.find(filter).toArray();
+      const userDetails = userResult.map((user) => {
+        const userClass = classItems.filter(
+          (item) => item?.instructorEmail === user?.email
+        );
+        const ClassDetail = {
+          ClassName: userClass.map((item) => item.className),
+          classImage: userClass.map((item) => item.classImage),
+          classQuantity: userClass.length,
+          classId: userClass.map((item) => item._id),
+          totalEnrolled: userClass.reduce(
+            (sum, item) => sum + item?.enrolled,
+            0
+          ),
+        };
+        return { ...ClassDetail, ...user };
+      });
+      userDetails
+        .sort((a, b) => b.totalEnrolled - a.totalEnrolled)
+        ?.slice(0, 6);
+      res.send(userDetails);
+    });
+
+    // all instructor
+    app.get("/instructors", async (req, res) => {
+      const classItems = await classCollection.find({}).toArray();
+      const filter = { role: "instructor" };
+      const userResult = await userCollection.find(filter).toArray();
+      const userDetails = userResult.map((user) => {
+        const userClass = classItems.filter(
+          (item) => item?.instructorEmail === user?.email
+        );
+        const ClassDetail = {
+          ClassName: userClass.map((item) => item.className),
+          classImage: userClass.map((item) => item.classImage),
+          classQuantity: userClass.length,
+          classId: userClass.map((item) => item._id),
+          totalEnrolled: userClass.reduce(
+            (sum, item) => sum + item?.enrolled,
+            0
+          ),
+        };
+        return { ...ClassDetail, ...user };
+      });
+      res.send(userDetails);
+    });
+
+    // instructor detail Class
+
+    // /instructorClasses
+
+ 
+
+    app.get("/instructorClasses/:id", async (req, res) => {
+      const classId = req.params.id;
+      const query = { _id: new ObjectId(classId) };
+      const userResult = await userCollection.findOne(query);
+      if (userResult.role !== "instructor") {
+        return res.send({ error: true, message: "not found" });
+      }
+      const filter = { instructorEmail: userResult.email };
+      const classesItems = await classCollection.find(filter).toArray();
+      const instructorDetails = {
+        classes: classesItems,
+        ClassesName: classesItems.map((item) => item.className),
+        classQuantity: classesItems.length,
+        totalEnrolled: classesItems.reduce(
+          (sum, item) => sum + item?.enrolled,
+          0
+        ),
+        availableSeats: classesItems.reduce(
+          (sum, item) => sum + item?.availableSeats,
+          0
+        ),
+        user: userResult,
+      };
+      res.send(instructorDetails);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
