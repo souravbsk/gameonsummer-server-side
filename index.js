@@ -287,7 +287,7 @@ async function run() {
         const email = req.query.email;
 
         const query = { instructorEmail: email };
-        const result = await classCollection.find(query).toArray();
+        const result = await classCollection.find(query).sort({status: 1}).toArray();
         res.send(result);
       }
     );
@@ -444,6 +444,8 @@ async function run() {
     // /instructorClasses
 
  
+
+    //todo : instructorClasses  replace instructorDetails
 
     app.get("/instructorClasses/:id", async (req, res) => {
       const classId = req.params.id;
