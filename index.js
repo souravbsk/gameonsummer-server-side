@@ -43,7 +43,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const userCollection = client.db("GameOnSummer").collection("users");
     const classCollection = client.db("GameOnSummer").collection("classes");
@@ -106,7 +106,6 @@ async function run() {
       if (findUser) {
         return res.send({ message: "user already exist" });
       }
-
 
       newUser.role = "student";
       const result = await userCollection.insertOne(newUser);
