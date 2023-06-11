@@ -106,6 +106,8 @@ async function run() {
       if (findUser) {
         return res.send({ message: "user already exist" });
       }
+
+
       newUser.role = "student";
       const result = await userCollection.insertOne(newUser);
       res.send(result);
@@ -113,7 +115,7 @@ async function run() {
 
     // admin route >>>>>> all user
     app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
-      const result = await userCollection.find({}).toArray();
+      const result = await userCollection.find({}).sort({role: 1}).toArray();
       res.send(result);
     });
 
@@ -193,7 +195,7 @@ async function run() {
     //classes api create_______________________________ for user
     app.get("/topclasses", async (req, res) => {
       const result = await classCollection
-        .find({})
+        .find({ status: "approved" })
         .sort({ enrolled: -1 })
         .limit(6)
         .toArray();
@@ -411,8 +413,10 @@ async function run() {
       });
       userDetails
         .sort((a, b) => b.totalEnrolled - a.totalEnrolled)
-        ?.slice(0, 6);
-      res.send(userDetails);
+        const topInstructorDetails = userDetails?.slice(0, 6);
+     
+     
+      res.send(topInstructorDetails);
     });
 
     // all instructor
@@ -445,7 +449,7 @@ async function run() {
 
  
 
-    //todo : instructorClasses  replace instructorDetails
+
 
     app.get("/instructorClasses/:id", async (req, res) => {
       const classId = req.params.id;
