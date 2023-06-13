@@ -114,7 +114,7 @@ async function run() {
 
     // admin route >>>>>> all user
     app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
-      const result = await userCollection.find({}).sort({role: 1}).toArray();
+      const result = await userCollection.find({}).sort({ role: 1 }).toArray();
       res.send(result);
     });
 
@@ -200,7 +200,7 @@ async function run() {
         .toArray();
       res.send(result);
     });
-    
+
     app.get("/classes", async (req, res) => {
       const result = await classCollection
         .find({ status: "approved" })
@@ -289,7 +289,10 @@ async function run() {
         const email = req.query.email;
 
         const query = { instructorEmail: email };
-        const result = await classCollection.find(query).sort({status: 1}).toArray();
+        const result = await classCollection
+          .find(query)
+          .sort({ status: 1 })
+          .toArray();
         res.send(result);
       }
     );
@@ -411,11 +414,9 @@ async function run() {
         };
         return { ...ClassDetail, ...user };
       });
-      userDetails
-        .sort((a, b) => b.totalEnrolled - a.totalEnrolled)
-        const topInstructorDetails = userDetails?.slice(0, 6);
-     
-     
+      userDetails.sort((a, b) => b.totalEnrolled - a.totalEnrolled);
+      const topInstructorDetails = userDetails?.slice(0, 6);
+
       res.send(topInstructorDetails);
     });
 
@@ -447,18 +448,14 @@ async function run() {
 
     // /instructorClasses
 
- 
-
-
-
-    app.get("/instructorClasses/:id", async (req, res) => {
+    app.get("/instructorClasses/:id", verifyJWT, verifyStudent, async (req, res) => {
       const classId = req.params.id;
       const query = { _id: new ObjectId(classId) };
       const userResult = await userCollection.findOne(query);
       if (userResult.role !== "instructor") {
         return res.send({ error: true, message: "not found" });
       }
-      const filter = { instructorEmail: userResult.email,status: "approved" };
+      const filter = { instructorEmail: userResult.email, status: "approved" };
       const classesItems = await classCollection.find(filter).toArray();
       const instructorDetails = {
         classes: classesItems,
@@ -473,207 +470,298 @@ async function run() {
           0
         ),
         user: userResult,
+        follower: userResult?.follower || [],
+        
       };
       res.send(instructorDetails);
     });
 
+    // ______________________________________
+    // optional _______________optional>>>>>>>>>>>>>>>>>>>>>>optional>>>>>>>>>>>>
 
+    app.get("/adminStack", verifyJWT, verifyAdmin, async (req, res) => {
+      const userResult = await userCollection.find({}).toArray();
+      const admin = userResult.filter((user) => user.role === "admin");
+      const student = userResult.filter((user) => user.role === "student");
+      const instructor = userResult.filter(
+        (user) => user.role === "instructor"
+      );
 
+      const adminStackInfo = [
+        {
+          name: "admin",
+          value: admin.length,
+        },
+        {
+          name: "instructor",
+          value: instructor.length,
+        },
+        {
+          name: "student",
+          value: student.length,
+        },
+      ];
+      res.send(adminStackInfo);
+    });
 
+    app.get(
+      "/instructorStack/:email",
+      verifyJWT,
+      verifyInstructor,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { instructorEmail: email };
+        const allClasses = await classCollection.find(query).toArray();
 
+        const totalApproved = allClasses.filter(
+          (item) => item.status == "approved"
+        );
+        const totalPending = allClasses.filter(
+          (item) => item.status == "pending"
+        );
+        const totalDeny = allClasses.filter((item) => item.status == "deny");
 
-// ______________________________________
-// optional _______________optional>>>>>>>>>>>>>>>>>>>>>>optional>>>>>>>>>>>>
+        const classStatus = [
+          {
+            name: "approved",
+            value: totalApproved.length,
+          },
+          {
+            name: "deny",
+            value: totalDeny.length,
+          },
+          {
+            name: "pending",
+            value: totalPending.length,
+          },
+        ];
 
-app.get("/adminStack", verifyJWT,verifyAdmin, async (req,res) => {
-  const userResult = await userCollection.find({}).toArray();
-  const admin = userResult.filter(user => user.role === "admin");
-  const student = userResult.filter(user => user.role === "student");
-  const instructor = userResult.filter(user => user.role === "instructor");
-  
-  const adminStackInfo = [
-    {
-      name:"admin",
-      value: admin.length,
-    },{
-      name:"instructor",
-      value: instructor.length
-    },
-    {
-      name:"student",
-      value: student.length
-    }
-  ]
-  res.send(adminStackInfo)
-})
+        res.send({
+          allClasses,
+          classStatus,
+        });
+      }
+    );
 
+    app.get(
+      "/studentStack/:email",
+      verifyJWT,
+      verifyStudent,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { userEmail: email };
+        const cartItems = await cartCollection.find(query).toArray();
+        const filter = { email: email };
+        const paymentItems = await paymentCollection.find(filter).toArray();
+        const totalPrice = cartItems.reduce((sum, item) => {
+          return sum + item.price;
+        }, 0);
+        const studentStackInfo = {
+          totalPrice,
+          quantity: cartItems.length,
+          totalEnroll: paymentItems.length,
+        };
+        res.send(studentStackInfo);
+      }
+    );
 
+    // profile ______________
+    // student
+    app.get(
+      "/studentProfile/:email",
+      verifyJWT,
+      verifyStudent,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { email: email };
+        const userResult = await userCollection.findOne(query);
+        if (userResult.role !== "student") {
+          return res
+            .status(403)
+            .send({ error: true, message: "not authorized" });
+        }
+        res.send(userResult);
+      }
+    );
 
-app.get("/instructorStack/:email", verifyJWT, verifyInstructor, async (req,res) => {
-  const email = req.params.email;
-  const query = {instructorEmail: email}
-  const allClasses = await classCollection.find(query).toArray();
+    // profile update
+    app.put(
+      "/studentProfile/:id",
+      verifyJWT,
+      verifyStudent,
+      async (req, res) => {
+        const userId = req.params.id;
+        const filter = { _id: new ObjectId(userId) };
+        const updateInfo = req.body;
+        const options = { upsert: true };
+        const updateDoc = {
+          $set: {
+            name: updateInfo.name,
+            address: updateInfo.address,
+            email: updateInfo.email,
+            gender: updateInfo.gender,
+            phone: updateInfo.phone,
+            image: updateInfo.image,
+          },
+        };
+        const result = await userCollection.updateOne(
+          filter,
+          updateDoc,
+          options
+        );
+        res.send(result);
+      }
+    );
 
-  const totalApproved =  allClasses.filter(item => item.status == "approved")
-  const totalPending =  allClasses.filter(item => item.status == "pending")
-  const totalDeny  =  allClasses.filter(item => item.status == "deny")
+    // profile ______________
+    // instructor profile
+    app.get(
+      "/instructorProfile/:email",
+      verifyJWT,
+      verifyInstructor,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { email: email };
+        const userResult = await userCollection.findOne(query);
+        if (userResult.role !== "instructor") {
+          return res
+            .status(403)
+            .send({ error: true, message: "not authorized" });
+        }
+        res.send(userResult);
+      }
+    );
 
-  const classStatus = [
-       {
-        name: "approved",
-        value: totalApproved.length,
-       },
-       {
-        name: "deny",
-        value: totalDeny.length,
-       },
-       {
-        name: "pending",
-        value: totalPending.length,
-       },
-    ]
+    // instructor update
+    app.put(
+      "/instructorProfile/:id",
+      verifyJWT,
+      verifyInstructor,
+      async (req, res) => {
+        const userId = req.params.id;
+        const filter = { _id: new ObjectId(userId) };
+        const updateInfo = req.body;
+        const options = { upsert: true };
+        const updateDoc = {
+          $set: {
+            name: updateInfo.name,
+            address: updateInfo.address,
+            email: updateInfo.email,
+            gender: updateInfo.gender,
+            phone: updateInfo.phone,
+            image: updateInfo.image,
+          },
+        };
+        const result = await userCollection.updateOne(
+          filter,
+          updateDoc,
+          options
+        );
+        res.send(result);
+      }
+    );
 
-  res.send({
-    allClasses,
-    classStatus
-  })
-  
-  
-})
+    // profile ______________
+    // admin profile
+    app.get(
+      "/adminProfile/:email",
+      verifyJWT,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { email: email };
+        const userResult = await userCollection.findOne(query);
+        if (userResult.role !== "admin") {
+          return res
+            .status(403)
+            .send({ error: true, message: "not authorized" });
+        }
+        res.send(userResult);
+      }
+    );
 
+    // admin update
+    app.put("/adminProfile/:id", verifyJWT, verifyAdmin, async (req, res) => {
+      const userId = req.params.id;
+      console.log(userId);
+      const filter = { _id: new ObjectId(userId) };
+      const updateInfo = req.body;
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          name: updateInfo.name,
+          address: updateInfo.address,
+          email: updateInfo.email,
+          gender: updateInfo.gender,
+          phone: updateInfo.phone,
+          image: updateInfo.image,
+        },
+      };
+      const result = await userCollection.updateOne(filter, updateDoc, options);
+      res.send(result);
+    });
 
-app.get("/studentStack/:email", verifyJWT, verifyStudent, async (req,res) => {
-  const email = req.params.email;
-  const query = {userEmail: email}
-  const cartItems = await cartCollection.find(query).toArray();
-  const filter = {email: email}
-const paymentItems = await paymentCollection.find(filter).toArray();
-  const totalPrice = cartItems.reduce((sum, item) => {
-     return sum + item.price;
-  },0)
-  const studentStackInfo = {
-    totalPrice,
-    quantity: cartItems.length,
-    totalEnroll : paymentItems.length
-  }
-  res.send(studentStackInfo)
-})
+    // ________________________follow instructor____________
+    app.put("/followInstructor/:email", async (req, res) => {
+      const email = req.params.email;
+      const instructorId = req.body.followId;
+      const studentQuery = { email: email, role: "student" };
+      const instructorQuery = {
+        _id: new ObjectId(instructorId),
+        role: "instructor",
+      };
 
+      const studentCollection = await userCollection.findOne(studentQuery);
+      const instructorCollection = await userCollection.findOne(instructorQuery);
+      const options = { upsert: true };
+      //studentFollowing set 
+      let Studentfollowing = [];
+      if (studentCollection.following) {
+        const replaceDuplicate = studentCollection.following.filter(id => id !== instructorId)
 
+        Studentfollowing = [...replaceDuplicate, instructorId];
+      } else {
+        Studentfollowing.push(instructorId);
+      }
+      const studentFollowingUpdate = {
+        $set: {
+          following: Studentfollowing,
+        },
+      };
 
-// profile ______________
-// student 
-app.get("/studentProfile/:email", verifyJWT, verifyStudent, async (req,res) => {
-  const email = req.params.email;
-  const query = {email:email}
-  const userResult  = await userCollection.findOne(query);
-  if(userResult.role !== "student"){
-    return res.status(403).send({error: true, message:"not authorized"})
-  }
-  res.send(userResult)
-})
+      //update student follow done 
+      const studentFollowResult = await userCollection.updateOne(
+        studentQuery,
+        studentFollowingUpdate,
+        options
+      );
 
-// profile update 
-app.put("/studentProfile/:id", verifyJWT, verifyStudent, async (req,res) => {
-  const userId = req.params.id;
-  const filter = {_id: new ObjectId(userId)};
-  const updateInfo = req.body;
-  const options = { upsert: true };
-  const updateDoc = {
-    $set: {
-      name: updateInfo.name,
-      address: updateInfo.address,
-      email: updateInfo.email,
-      gender: updateInfo.gender,
-      phone: updateInfo.phone,
-      image: updateInfo.image,
-    },
-  };
-  const result = await userCollection.updateOne(filter, updateDoc, options);
-  res.send(result)
-} )
+      // instructor follower save
+      let instructorFollower = [];
+      if(instructorCollection.follower){
+        const studentId = studentCollection?._id.toString();
+        const replaceDuplicate = instructorCollection.follower.filter(id => id !== studentId)
+        instructorFollower = [...replaceDuplicate,studentId]
+      }
+      else{ 
+        const studentId = studentCollection?._id.toString();
+        instructorFollower.push(studentId)
+      }
 
+      const teacherFollowerUpdate = {
+        $set: {
+          follower: instructorFollower,
+        },
+      };
+      const instructorFollowerResult = await userCollection.updateOne(
+        instructorQuery,
+        teacherFollowerUpdate,
+        options
+      );
 
-
-
-
-
-
-
-// profile ______________
-// instructor profile 
-app.get("/instructorProfile/:email", verifyJWT, verifyInstructor, async (req,res) => {
-  const email = req.params.email;
-  const query = {email:email}
-  const userResult  = await userCollection.findOne(query);
-  if(userResult.role !== "instructor"){
-    return res.status(403).send({error: true, message:"not authorized"})
-  }
-  res.send(userResult)
-})
-
-// instructor update 
-app.put("/instructorProfile/:id", verifyJWT, verifyInstructor, async (req,res) => {
-  const userId = req.params.id;
-  const filter = {_id: new ObjectId(userId)};
-  const updateInfo = req.body;
-  const options = { upsert: true };
-  const updateDoc = {
-    $set: {
-      name: updateInfo.name,
-      address: updateInfo.address,
-      email: updateInfo.email,
-      gender: updateInfo.gender,
-      phone: updateInfo.phone,
-      image: updateInfo.image,
-    },
-  };
-  const result = await userCollection.updateOne(filter, updateDoc, options);
-  res.send(result)
-} )
-
-
-
-
-// profile ______________
-// admin profile 
-app.get("/adminProfile/:email", verifyJWT, verifyAdmin, async (req,res) => {
-  const email = req.params.email;
-  const query = {email:email}
-  const userResult  = await userCollection.findOne(query);
-  if(userResult.role !== "admin"){
-    return res.status(403).send({error: true, message:"not authorized"})
-  }
-  res.send(userResult)
-})
-
-// admin update 
-app.put("/adminProfile/:id", verifyJWT, verifyAdmin, async (req,res) => {
-  const userId = req.params.id;
-  console.log(userId);
-  const filter = {_id: new ObjectId(userId)};
-  const updateInfo = req.body;
-  const options = { upsert: true };
-  const updateDoc = {
-    $set: {
-      name: updateInfo.name,
-      address: updateInfo.address,
-      email: updateInfo.email,
-      gender: updateInfo.gender,
-      phone: updateInfo.phone,
-      image: updateInfo.image,
-    },
-  };
-  const result = await userCollection.updateOne(filter, updateDoc, options);
-  res.send(result)
-} )
-
-
-
-
-
-
-
+      
+      res.send({studentFollowResult,instructorFollowerResult});
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
